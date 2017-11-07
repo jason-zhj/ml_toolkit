@@ -96,8 +96,8 @@ def _calc_precision_recall(radius,item,db_set):
     query_hash = item["hash"]
     query_label = item["label"]
     total_correct = sum([1 for item in db_set if item["label"]==query_label])  # total number of correct items to be retrieved
-    correct_retrieved = [0 for i in range(radius+1)]  # record # correctly retrieved for each distance
-    total_retrieved = [0 for i in range(radius+1)] # record # retrieved for each distance
+    correct_retrieved = [0 for _ in range(radius+1)]  # record # correctly retrieved for each distance
+    total_retrieved = [0 for _ in range(radius+1)] # record # retrieved for each distance
     # record correct_retrieved and total_retrieved for each distance within radius
     for dist in range(radius+1):
         hashes_to_retr = _compute_hash_with_dist(hashcode=query_hash, dist=dist)
@@ -111,7 +111,7 @@ def _calc_precision_recall(radius,item,db_set):
     # calc precision recall
     dist_precisions = [correct_retrieved[i] * 1.0 / total_retrieved[i] if total_retrieved[i] > 0 else 0
                        for i in range(len(total_retrieved))]
-    radius_precisions = [sum(correct_retrieved[:i+1]) * 1.0 / sum(total_retrieved[:i+1]) if total_retrieved[i] > 0 else 0
+    radius_precisions = [sum(correct_retrieved[:i+1]) * 1.0 / sum(total_retrieved[:i+1]) if sum(total_retrieved[:i+1]) > 0 else 0
                        for i in range(len(total_retrieved))]
     dist_recalls = [correct_retrieved[i] * 1.0 / total_correct if total_correct > 0 else 0
                        for i in range(len(correct_retrieved))]
