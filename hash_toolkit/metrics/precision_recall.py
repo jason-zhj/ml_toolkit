@@ -1,15 +1,10 @@
 """
 this includes the computation for precision, recall, MAP
 """
-#TODO: add MAP measure
-# TODO: add MAP measure
-
-# TODO: add MAP measure
-# TODO: add MAP measure
 import operator
 
 import matplotlib.pyplot as plt
-from hash_toolkit.metrics.utils import _fig2img, _compute_hash_with_dist, _retrieve_items_using_hash, _get_hdist
+from ml_toolkit.hash_toolkit.metrics.utils import _fig2img, _compute_hash_with_dist, _retrieve_items_using_hash, _get_hdist
 
 
 def _calc_precision_recall(radius,item,db_set):
@@ -174,9 +169,10 @@ def get_precision_vs_recall(test_set,db_set,max_hdist):
     return  results
 
 
-def plot_avg_precision_vs_recall(pr_list):
+def plot_avg_precision_vs_recall(pr_list,popup=True):
     """
     :param pr_list: list of {"precisions":[],"recalls":[]}, output of `get_precision_vs_recall`
+    :param popup: the figure will pop up if this is True
     :return: {"avg_precisions":[],"avg_recalls":[],"plot":Image object}
     """
     for item in pr_list:
@@ -200,8 +196,9 @@ def plot_avg_precision_vs_recall(pr_list):
     figplt.plot(avg_recalls,avg_precisions)
     plt.xlabel("recall")
     plt.ylabel("precision")
-    plt.title("Precision vs. Recall for 16-bit hash")
-    plt.show()
+    plt.title("Precision vs. Recall")
+    if (popup):
+        plt.show()
     image = _fig2img(fig=fig)
     return {"avg_precisions":avg_precisions,"avg_recalls":avg_recalls,"plot":image}
 
