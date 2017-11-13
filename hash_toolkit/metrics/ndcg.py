@@ -1,5 +1,5 @@
 import math
-from hash_toolkit.metrics.utils import _compute_hash_with_dist, _retrieve_items_using_hash
+from ml_toolkit.hash_toolkit.metrics.utils import _compute_hash_with_dist, _retrieve_items_using_hash
 
 #TODO: need more comprehensive testing
 

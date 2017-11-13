@@ -47,7 +47,9 @@ def _calc_precision_recall(radius,item,db_set):
         "precision-radius": radius_precisions,
         "recall-dist": dist_recalls,
         "recall-radius": radius_recalls,
-        "avg-precision": avg_precision
+        "avg-precision": avg_precision,
+        "retrieved-dist": total_retrieved,
+        "retrieved-ratio-dist": [i * 1.0 / len(db_set) for i in total_retrieved] # percentage of db data retrieved
     }
 
 def calculate_precision_recall(radius, db_set, test_set):
@@ -62,6 +64,8 @@ def calculate_precision_recall(radius, db_set, test_set):
         "precision-radius":[0 for _ in range(radius+1)],
         "recall-dist":[0 for _ in range(radius+1)],
         "recall-radius":[0 for _ in range(radius+1)],
+        "retrieved-dist": [0 for _ in range(radius+1)],
+        "retrieved-ratio-dist": [0 for _ in range(radius + 1)],
     }
     mean_avg_precision = 0
     for item in test_set:
