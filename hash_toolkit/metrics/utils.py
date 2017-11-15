@@ -86,6 +86,12 @@ def _retrieve_items_using_hash(db_set, hashcode):
     "return a list of {'label':..,'hash':..}, retrieved from `db_set`, `db_set` should be list of dict"
     return [item for item in db_set if item["hash"]==hashcode]
 
+def _retrieve_items_at_dist(db_set,hashcode,dist):
+    hash_ls = _compute_hash_with_dist(hashcode=hashcode,dist=dist)
+    items = []
+    for code in hash_ls:
+        items += _retrieve_items_using_hash(db_set=db_set,hashcode=code)
+    return items
 
 def _get_hdist(code1, code2):
     "return hamming distance"

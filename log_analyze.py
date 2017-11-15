@@ -24,7 +24,8 @@ def _extract_var_values(var_names, var_indexes, var_types, lines):
             var_value_dict[var_names[i]].append(typecast(items[index]))
     return var_value_dict
 
-def plot_trend_graph(var_names,var_indexes,var_types,var_colors,lines):
+def plot_trend_graph(var_names,var_indexes,var_types,var_colors,lines,title="",
+                     show_fig=True,save_to=None):
     """
     :param var_names:
     :param var_indexes: if the var to plot is the 1st number in a line, its `var_index` should be 0
@@ -37,6 +38,11 @@ def plot_trend_graph(var_names,var_indexes,var_types,var_colors,lines):
     var_value_dict = _extract_var_values(var_names=var_names, var_types=var_types, var_indexes=var_indexes, lines=lines)
     # plot graph
     x = range(len(lines))
+    plt.figure()
     for name,values in var_value_dict.items():
         plt.plot(x,values,color=var_color_dict[name])
-    plt.show()
+    plt.title(title)
+    if (show_fig):
+        plt.show()
+    if (save_to is not None):
+        plt.savefig(save_to)
