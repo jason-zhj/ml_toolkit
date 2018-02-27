@@ -4,7 +4,7 @@ Utility functions for calculating hashing metrics
 
 import io
 import itertools
-
+from collections import defaultdict
 import numpy as np
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -97,3 +97,46 @@ def _get_hdist(code1, code2):
     "return hamming distance"
     assert len(code1) == len(code2)
     return len([1 for i in range(len(code1)) if code1[i]!=code2[i]])
+
+
+def _retrieve_items_all(db_set,hashcode,max_hdist=None):
+    "return a dict {0:[list of items],1:[]...}"
+    results = defaultdict(list)
+    for item in db_set:
+        dist = _get_hdist(item["hash"],hashcode)
+        if (max_hdist is None or dist <= max_hdist):
+            results[dist].append(item)
+
+    # fill up zero entry for non-existent keys
+    max_key = max_hdist if max_hdist is not None else len(hashcode)
+    for i in range(max_hdist+1):
+        if (i not in results.keys()):
+            results[i] = []
+    return results
+
+def compute_line(p,q):
+    x0,y0 = p
+    x1,y1 = q
+    k = (y1 - y0)/(x1 - x0)
+    b = y0 - k*x0
+    return k,b
+
+def compare_performance(l1,l2):
+    "l1,l2 is a list: [(p0,r0),(p1,r1),(p2,r2)], return 1 if l1 lies above l2, -1 if below, 0 if neither above or below"
+    p1,p2,p3 = l1
+    q1,q2,q3 = l2
+    lie_above = [True for _ in range(3)] # record True if p lies above q
+    k,b = compute_line(q1,q2)
+    if (p1[1] < k * p1[0] + b): lie_above[0] = False
+    if (p2[1] < k * p2[0] + b): lie_above[1] = False
+
+    k, b = compute_line(q2, q3)
+    if (p2[1] < k * p2[0] + b): lie_above[1] = False
+    if (p3[1] < k * p3[0] + b): lie_above[2] = False
+
+    if (all(lie_above)):
+        return 1
+    elif (all([not i for i in lie_above])):
+        return -1
+    else:
+        return 0

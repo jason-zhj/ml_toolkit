@@ -4,7 +4,7 @@ this includes the computation for precision, recall, MAP
 import operator
 
 import matplotlib.pyplot as plt
-from ml_toolkit.hash_toolkit.metrics.utils import _fig2img, _compute_hash_with_dist, _retrieve_items_using_hash, _get_hdist
+from ml_toolkit.hash_toolkit.metrics.utils import _fig2img, _compute_hash_with_dist, _retrieve_items_using_hash, _get_hdist, _retrieve_items_all
 
 
 def _calc_precision_recall(radius,item,db_set):
@@ -40,8 +40,10 @@ def _calc_precision_recall(radius,item,db_set):
                        for i in range(len(correct_retrieved))]
     # calc MAP
     index_to_use = [i for i in range(len(correct_retrieved)) if correct_retrieved[i] > 0]
+
     avg_precision = sum([radius_precisions[i] for i in index_to_use]) / len(index_to_use) \
         if len(index_to_use) > 0 else 0
+
     return {
         "precision-dist": dist_precisions,
         "precision-radius": radius_precisions,
@@ -52,7 +54,7 @@ def _calc_precision_recall(radius,item,db_set):
         "retrieved-ratio-dist": [i * 1.0 / len(db_set) for i in total_retrieved] # percentage of db data retrieved
     }
 
-def calculate_precision_recall(radius, db_set, test_set):
+def calculate_precision_recall(radius, db_set, test_set, get_label_specific_details = True):
     """
     :param dist_or_radius: either dist or radius
     :param use_dist: if True, `dist_or_radius` will be used as distance, otherwise as radius
@@ -66,18 +68,52 @@ def calculate_precision_recall(radius, db_set, test_set):
         "recall-radius":[0 for _ in range(radius+1)],
         "retrieved-dist": [0 for _ in range(radius+1)],
         "retrieved-ratio-dist": [0 for _ in range(radius + 1)],
+        "label-specific-details":{
+            # record the average precision, recall for each class (i.e. label) of images
+        }
     }
+    label_detail_dict = result_dict["label-specific-details"]
     mean_avg_precision = 0
+
     for item in test_set:
         item_result = _calc_precision_recall(radius=radius,item=item, db_set=db_set)
+
+        # recall overall results
         for key in result_dict.keys():
-            result_dict[key] = list(map(operator.add,result_dict[key],item_result[key]))
+            if (key != "label-specific-details"):
+                result_dict[key] = list(map(operator.add,result_dict[key],item_result[key]))
         mean_avg_precision += item_result["avg-precision"]
 
-    # divide by number of test items
+        # recall results specific for each label
+        if (get_label_specific_details):
+            item_label = item["label"]
+
+            if (item_label not in label_detail_dict.keys()):
+                label_detail_dict[item_label] = {
+                    "count":1,
+                    "precision-dist": item_result["precision-dist"],
+                    "precision-radius": item_result["precision-radius"],
+                    "recall-dist": item_result["recall-dist"],
+                    "recall-radius": item_result["recall-radius"],
+                }
+            else:
+                label_detail_dict[item_label]["count"] += 1
+                for key in ["precision-dist","precision-radius","recall-dist","recall-radius"]:
+                    label_detail_dict[item_label][key] = list(map(operator.add,label_detail_dict[item_label][key],item_result[key]))
+
+
+    # divide by number of test items (overall result)
     for key in result_dict.keys():
-        result_dict[key] = [item / len(test_set) for item in result_dict[key]]
+        if (key!="label-specific-details"):
+            result_dict[key] = [item / len(test_set) for item in result_dict[key]]
     result_dict["mean-avg-precision"] = mean_avg_precision / len(test_set)
+
+    # divide by number of items (label-specific result)
+    for label in label_detail_dict.keys():
+        detail_dict = label_detail_dict[label]
+        count = detail_dict["count"]
+        for key in ["precision-dist", "precision-radius", "recall-dist", "recall-radius"]:
+            detail_dict[key] = list(map(operator.truediv,detail_dict[key],[count for _ in range(len(detail_dict[key]))]))
 
     return result_dict
 
@@ -92,40 +128,33 @@ def get_mean_avg_precision(test_set,db_set,maxdist):
     """
     m_a_p = 0
     for query in test_set:
-        m_a_p += _get_avg_precision_for_query(query=query,db_set=db_set,maxdist=maxdist)
+        m_a_p += _get_avg_precision_for_query(query=query, db_set=db_set, max_hdist=maxdist)
     return m_a_p / len(test_set)
 
-def _get_avg_precision_for_query(query, db_set, maxdist):
-    """
-    refer to https://i.ytimg.com/vi/pM6DJ0ZZee0/maxresdefault.jpg for formula
-    :param query: list of {hash:"101",label:".."}
-    :param db_set: list of {hash:"101",label:".."}
-    :param maxdist: maximum distance to retrieve
-    :return: average precision for this single query
-    """
-    query_code = query["hash"]
+
+def _get_avg_precision_for_query(query, db_set, max_hdist=None):
+    query_hash = query["hash"]
     query_label = query["label"]
+    retrieve_results = _retrieve_items_all(db_set=db_set, hashcode=query_hash, max_hdist=max_hdist)
+    max_key = max(retrieve_results.keys())
+    total_retrieved = [len(retrieve_results[i]) for i in range(max_key+1)]
+    correct_retrieved = [
+        len([item for item in retrieve_results[i] if item["label"]==query_label])
+        for i in range(max_key + 1)
+    ]
+    radius_precisions = [
+        sum(correct_retrieved[:i + 1]) * 1.0 / sum(total_retrieved[:i + 1]) if sum(total_retrieved[:i + 1]) > 0 else 0
+        for i in range(len(total_retrieved))]
+
     avg_precision = 0
     num_added = 0
-    total_retrieved = 0
-    correct_retrieved = 0
-    for d in range(maxdist):
-        hash_ls = _compute_hash_with_dist(hashcode=query_code, dist=d)
-        retrieved_items = []
-        include = False # include precision at this distance when there is correct item retrieved
-        for hash in hash_ls:
-            retrieved_items = _retrieve_items_using_hash(db_set=db_set, hashcode=hash)
-            total_retrieved += len(retrieved_items)
-            new_correct = len([t for t in retrieved_items if t["label"]==query_label])
-            if (new_correct > 0):
-                correct_retrieved +=new_correct
-                include = True
-
-        if (include):
+    for i, correct_num in enumerate(correct_retrieved):
+        if (correct_num > 0):
+            avg_precision += radius_precisions[i]
             num_added += 1
-            avg_precision += float(correct_retrieved) / total_retrieved
 
-    return avg_precision / num_added
+    return avg_precision / num_added if num_added > 0 else 0
+
 
 
 def get_precision_vs_recall(test_set,db_set,max_hdist):

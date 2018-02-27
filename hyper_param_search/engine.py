@@ -38,3 +38,10 @@ else: # besteach
             write_record_to_csv(param_dict=param_dict,result_dict=result_dict,path=setting.save_result_to,first_write=first_write)
             first_write = False
 
+class LoopEngine():
+    def __init__(self,default_params,tune_params):
+        self.default_params = default_params
+        self.tune_params = tune_params
+
+    def get_params(self):
+        "generator"

@@ -25,14 +25,15 @@ def process_CNN_feature_file(filename):
     return return_dict
 
 
-def _plot_embedding(X, y, d, title=None):
+def _plot_embedding(X, y, d, title=None,show=True,save_to=None):
     """Plot an embedding X with the class label y colored by the domain d."""
     x_min, x_max = np.min(X, 0), np.max(X, 0)
     X = (X - x_min) / (x_max - x_min)
 
     # Plot colors numbers
     # plt.figure(figsize=(10,10))
-    ax = plt.subplot(111)
+    # ax = plt.subplot(111)
+    plt.figure()
     for i in range(X.shape[0]):
         # plot colored number
         plt.text(X[i, 0], X[i, 1], str(y[i]),
@@ -42,6 +43,10 @@ def _plot_embedding(X, y, d, title=None):
     plt.xticks([]), plt.yticks([])
     if title is not None:
         plt.title(title)
+    if (show):
+        plt.show()
+    if (save_to):
+        plt.savefig(save_to)
 
 def save_2d_features(features,domains,labels,save_dest):
     "save a tab delimited csv file, in the format of domain\tlabel\tx\ty containing features"

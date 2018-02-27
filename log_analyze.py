@@ -37,10 +37,16 @@ def plot_trend_graph(var_names,var_indexes,var_types,var_colors,lines,title="",
     # get values
     var_value_dict = _extract_var_values(var_names=var_names, var_types=var_types, var_indexes=var_indexes, lines=lines)
     # plot graph
-    x = range(len(lines))
+    return _plot_trend_graph(var_value_dict=var_value_dict,var_color_dict=var_color_dict,title=title,show_fig=show_fig,save_to=save_to)
+
+
+
+def _plot_trend_graph(var_value_dict,var_color_dict,title="",
+                     show_fig=True,save_to=None):
     plt.figure()
-    for name,values in var_value_dict.items():
-        plt.plot(x,values,color=var_color_dict[name])
+    for name, values in var_value_dict.items():
+        x = range(len(values))
+        plt.plot(x, values, color=var_color_dict[name])
     plt.title(title)
     if (show_fig):
         plt.show()
