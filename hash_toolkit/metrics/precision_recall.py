@@ -1,11 +1,11 @@
 """
 this includes the computation for precision, recall, MAP
+This supports inactive bit, '-' represents inactive
 """
 import operator
 
 import matplotlib.pyplot as plt
-from ml_toolkit.hash_toolkit.metrics.utils import _fig2img, _compute_hash_with_dist, _retrieve_items_using_hash, _get_hdist, _retrieve_items_all
-
+from ml_toolkit.hash_toolkit.metrics.utils import _fig2img, _compute_hash_with_dist, _retrieve_items_using_hash, get_hdist, _retrieve_items_all
 
 def _calc_precision_recall(radius,item,db_set):
     """
@@ -20,14 +20,12 @@ def _calc_precision_recall(radius,item,db_set):
     correct_retrieved = [0 for _ in range(radius+1)]  # record # correctly retrieved for each distance
     total_retrieved = [0 for _ in range(radius+1)] # record # retrieved for each distance
     # record correct_retrieved and total_retrieved for each distance within radius
-    for dist in range(radius+1):
-        hashes_to_retr = _compute_hash_with_dist(hashcode=query_hash, dist=dist)
-        retrieved_items = []
-        for hashcode in hashes_to_retr:
-            retrieved_items += _retrieve_items_using_hash(db_set=db_set, hashcode=hashcode)
-
-        total_retrieved[dist] = len(retrieved_items)
-        correct_retrieved[dist] = len([item for item in retrieved_items if item["label"] == query_label])
+    for db_item in db_set:
+        dist = get_hdist(item["hash"],db_item["hash"])
+        if (dist <= radius):
+            total_retrieved[dist] += 1
+            if (item["label"]==db_item["label"]):
+                correct_retrieved[dist] += 1
 
     # calc precision recall
     dist_precisions = [correct_retrieved[i] * 1.0 / total_retrieved[i] if total_retrieved[i] > 0 else 0
@@ -54,7 +52,7 @@ def _calc_precision_recall(radius,item,db_set):
         "retrieved-ratio-dist": [i * 1.0 / len(db_set) for i in total_retrieved] # percentage of db data retrieved
     }
 
-def calculate_precision_recall(radius, db_set, test_set, get_label_specific_details = True):
+def calculate_precision_recall(radius, db_set, test_set, get_label_specific_details = False):
     """
     :param dist_or_radius: either dist or radius
     :param use_dist: if True, `dist_or_radius` will be used as distance, otherwise as radius
@@ -175,7 +173,7 @@ def get_precision_vs_recall(test_set,db_set,max_hdist):
         total_class_num = 0 # how many items in db have the same label as query_label
         for db_item in db_set:
             db_item_hash = db_item["hash"]
-            hdist = _get_hdist(query_hash, db_item_hash)
+            hdist = get_hdist(query_hash, db_item_hash)
             if (db_item["label"] == query_label):
                 record_dict[hdist]["correct"] += 1
                 total_class_num += 1

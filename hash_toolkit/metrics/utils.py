@@ -93,17 +93,21 @@ def _retrieve_items_at_dist(db_set,hashcode,dist):
         items += _retrieve_items_using_hash(db_set=db_set,hashcode=code)
     return items
 
-def _get_hdist(code1, code2):
-    "return hamming distance"
+def get_hdist(code1, code2):
+    "return hamming distance, '-' is recognized as inactive bit"
     assert len(code1) == len(code2)
-    return len([1 for i in range(len(code1)) if code1[i]!=code2[i]])
+    dist = 0
+    for c1, c2 in zip(code1, code2):
+        if (c1 != c2 and c1 != "-" and c2 != "-"):
+            dist += 1
+    return dist
 
 
 def _retrieve_items_all(db_set,hashcode,max_hdist=None):
     "return a dict {0:[list of items],1:[]...}"
     results = defaultdict(list)
     for item in db_set:
-        dist = _get_hdist(item["hash"],hashcode)
+        dist = get_hdist(item["hash"], hashcode)
         if (max_hdist is None or dist <= max_hdist):
             results[dist].append(item)
 

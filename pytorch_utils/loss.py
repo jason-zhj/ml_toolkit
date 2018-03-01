@@ -75,8 +75,8 @@ def get_L2_norm(x):
     pass
 
 def get_L1_norm(x):
-    "return |x|1"
-    return torch.sum(torch.abs(x))
+    "return |x|1, sum along each row"
+    return torch.sum(torch.abs(x),dim=1)
 
 
 def get_rms_diff(x,y):

@@ -58,18 +58,15 @@ def get_data_loader(data_path,image_scale,dataset_mean,dataset_std,batch_size,sh
     return  torch.utils.data.DataLoader(dataset,
                                                 batch_size=batch_size, shuffle=shuffle_batch)
 
-# if you have a hash function that returns list of digits -1, 1 as a hash code
-# this wrapper converts that to a string of 0 ,1
+# if you have a hash function that returns list of digits -1, 1, 0(inactive bit) as a hash code
+# this wrapper converts that to a string of 0 ,1, and `-` (inactive bit)
 def hash_func_wrapper(hash_func):
 
     def wrapped(images):
         outputs = hash_func(images)
-        hash_str_ls = []
-        for output in outputs:
-            output = output.data.cpu().numpy().astype(np.int8)
-            output[output == -1] = 0
-            hash_str = "".join(output.astype(np.str))
-            hash_str_ls.append(hash_str)
-        return hash_str_ls
+        outputs = outputs.data.numpy().astype(np.int8).astype(str)
+        outputs[outputs == '0'] = '-'
+        outputs[outputs == '-1'] = '0'
+        return ["".join(o) for o in outputs]
 
     return wrapped
