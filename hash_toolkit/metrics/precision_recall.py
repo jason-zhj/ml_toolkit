@@ -235,3 +235,9 @@ def plot_avg_precision_vs_recall(pr_list,popup=True):
     image = _fig2img(fig=fig)
     return {"avg_precisions":avg_precisions,"avg_recalls":avg_recalls,"plot":image}
 
+def get_precision_recall_curve(query_set,db_set):
+    "return PIL Image object, of P-R curve"
+    max_hdist = len(query_set[0]["hash"])
+    pr_dict = get_precision_vs_recall(test_set=query_set, db_set=db_set, max_hdist=max_hdist)
+    precision_recall_dict = plot_avg_precision_vs_recall(pr_list=pr_dict, popup=False)
+    return precision_recall_dict["plot"]

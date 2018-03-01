@@ -1,6 +1,9 @@
 import torch
 import numpy as np
+import torchvision
 from torch.autograd import Variable
+from torchvision import transforms
+
 
 def calc_output_dim(models,input_dim):
     """
@@ -15,3 +18,58 @@ def calc_output_dim(models,input_dim):
     for model in models:
         output = model(output)
     return output.data.view(output.data.size(0), -1).size(1)
+
+
+def autocuda(var):
+    if torch.cuda.is_available():
+        return var.cuda()
+    else:
+        return var
+
+def str_param_module(params):
+    "return the string representation of the params module"
+    filtered_items = {key: value for key, value in vars(params).items() if key.find("__") != 0}
+    ls = []
+    for key, value in filtered_items.items():
+        ls.append("{}={}".format(key, value))
+
+    return "\n".join(ls)
+
+def save_models(models,save_model_to,save_obj=True,save_params=True):
+    "models is a dict {name:model_obj}"
+    for name,model in models.items():
+        if (save_obj):
+            torch.save(model, os.path.join(save_model_to, "{}.model".format(name)))
+        if (save_params):
+            torch.save(model.state_dict(), os.path.join(save_model_to, "{}.params".format(name)))
+
+
+def get_data_loader(data_path,image_scale,dataset_mean,dataset_std,batch_size,shuffle_batch):
+    "return a torch data loader"
+    # image loading
+    preprocess = transforms.Compose([
+        transforms.Scale(image_scale),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=dataset_mean, std=dataset_std)
+    ])
+
+    # create dataloader
+    dataset = torchvision.datasets.ImageFolder(root=data_path, transform=preprocess)
+    return  torch.utils.data.DataLoader(dataset,
+                                                batch_size=batch_size, shuffle=shuffle_batch)
+
+# if you have a hash function that returns list of digits -1, 1 as a hash code
+# this wrapper converts that to a string of 0 ,1
+def hash_func_wrapper(hash_func):
+
+    def wrapped(images):
+        outputs = hash_func(images)
+        hash_str_ls = []
+        for output in outputs:
+            output = output.data.cpu().numpy().astype(np.int8)
+            output[output == -1] = 0
+            hash_str = "".join(output.astype(np.str))
+            hash_str_ls.append(hash_str)
+        return hash_str_ls
+
+    return wrapped

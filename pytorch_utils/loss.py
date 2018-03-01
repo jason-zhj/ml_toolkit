@@ -6,11 +6,11 @@ import sys, os
 from torch.autograd import Variable
 sys.path.append(os.path.dirname(__file__))
 from preprocess import convert_to_onehot
+from misc import autocuda
 
 def get_pairwise_sim_loss(feats,labels,num_classes=31,normalize=True,feat_scale=16):
-    labels_onehot = Variable(convert_to_onehot(labels=labels,num_class=num_classes),requires_grad=False)
-    if (torch.cuda.is_available()):
-        labels_onehot.cuda()
+    labels_onehot = autocuda(Variable(convert_to_onehot(labels=labels,num_class=num_classes),requires_grad=False))
+
     # do inner product of features
     vec_len = feats.data.size(1)
     A_square = torch.mm(feats, feats.t()) / vec_len * feat_scale # we need to divide the vector length, otherwise the loss will be affected by the length of hash code
@@ -30,9 +30,9 @@ def get_pairwise_sim_loss(feats,labels,num_classes=31,normalize=True,feat_scale=
 
 def get_crossdom_pairwise_sim_loss(src_feats,tgt_feats,src_labels,tgt_labels,num_classes=31,normalize=True,feat_scale=16):
     "loss: sum(logp(hi,hj)), where p is defined by sigmoid function"
-    src_labels_onehot = Variable(convert_to_onehot(labels=src_labels, num_class=num_classes), requires_grad=False).cuda()
-    tgt_labels_onehot = Variable(convert_to_onehot(labels=tgt_labels, num_class=num_classes),
-                                 requires_grad=False).cuda()
+    src_labels_onehot = autocuda(Variable(convert_to_onehot(labels=src_labels, num_class=num_classes), requires_grad=False))
+    tgt_labels_onehot = autocuda(Variable(convert_to_onehot(labels=tgt_labels, num_class=num_classes),
+                                 requires_grad=False))
     assert src_feats.data.size(1) == tgt_feats.data.size(1)
     vec_len = src_feats.data.size(1)
 
@@ -77,3 +77,23 @@ def get_L2_norm(x):
 def get_L1_norm(x):
     "return |x|1"
     return torch.sum(torch.abs(x))
+
+
+def get_rms_diff(x,y):
+    "return the root mean square of (x-y)"
+    p = torch.pow(
+        torch.add(x,-y),
+        2
+    )
+    vector_len = Variable(torch.FloatTensor([x.data.size(0) for _ in range(x.data.size(0))]), requires_grad=False)
+    return torch.sqrt(torch.sum(p / vector_len))
+
+def get_quantization_loss(continuous_code):
+    "continuous code is output of `torch.tanh`, which should range between [-1,1]"
+    discrete_code = torch.sign(continuous_code)
+    quantization_loss = torch.sum(
+        torch.pow(
+            torch.add(discrete_code, torch.neg(continuous_code)), 2
+        )
+    )
+    return quantization_loss / len(continuous_code)
