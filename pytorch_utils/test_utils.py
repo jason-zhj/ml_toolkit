@@ -26,15 +26,16 @@ def _hash_data(data_loader,hash_model):
     ]
 
 
-def run_test(query_loader,db_loader,hash_model,radius):
+def run_test(query_loader,db_loader,query_hash_model,db_hash_model,radius):
     """
     :param hash_model: a function that takes in image tensor and output hash code
     :param radius: radius within which to calculate precision, recall
     :return: result dict
     """
     # hash data
-    query_set = _hash_data(data_loader=query_loader,hash_model=hash_model)
-    db_set = _hash_data(data_loader=db_loader,hash_model=hash_model)
+    query_set = _hash_data(data_loader=query_loader,hash_model=query_hash_model)
+    db_set = _hash_data(data_loader=db_loader,hash_model=db_hash_model)
+
     # measure performance
     precision_recall_results = calculate_precision_recall(radius=radius, db_set=db_set, test_set=query_set)
     pr_curve = get_precision_recall_curve(query_set=query_set,db_set=db_set)

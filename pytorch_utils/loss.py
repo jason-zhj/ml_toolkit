@@ -50,9 +50,15 @@ def get_crossdom_pairwise_sim_loss(src_feats,tgt_feats,src_labels,tgt_labels,num
     num_pairs = len(src_labels) * len(tgt_labels)
     return torch.sum(-sum_log_prob) / num_pairs if normalize else torch.sum(-sum_log_prob)
 
-#TODO: edit this
-def get_mmd_loss(x,y, alpha=1.1, B=1.1):
-    "Kernel MMD loss"
+def get_mmd_loss(x,y, alpha=1.0):
+    """
+    :param x: source domain features
+    :param y: target domain features
+    :param alpha: kernel parameter
+    :return: RBF Kernel MMD
+    """
+    assert len(x) == len(y)
+    B = len(x) # batch size
     x = x.view(x.size(0), x.size(2) * x.size(3))
     y = y.view(y.size(0), y.size(2) * y.size(3))
 
