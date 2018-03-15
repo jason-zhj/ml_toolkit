@@ -8,6 +8,13 @@ sys.path.append(os.path.dirname(__file__))
 from preprocess import convert_to_onehot
 from misc import autocuda
 
+
+def normalize_by_rows(m):
+    "divide each element by its row's L2 norm"
+    qn = torch.norm(m, p=2, dim=1).detach()
+    return m.div(qn.expand_as(m))
+
+
 def get_pairwise_sim_loss(feats,labels,num_classes=31,normalize=True,feat_scale=16):
     labels_onehot = autocuda(Variable(convert_to_onehot(labels=labels,num_class=num_classes),requires_grad=False))
 
@@ -52,6 +59,7 @@ def get_crossdom_pairwise_sim_loss(src_feats,tgt_feats,src_labels,tgt_labels,num
 
 def get_mmd_loss(x,y, alpha=1.0):
     """
+    this will first normalize each row before computing MMD
     :param x: source domain features
     :param y: target domain features
     :param alpha: kernel parameter
@@ -59,8 +67,11 @@ def get_mmd_loss(x,y, alpha=1.0):
     """
     assert len(x) == len(y)
     B = len(x) # batch size
-    x = x.view(x.size(0), x.size(2) * x.size(3))
-    y = y.view(y.size(0), y.size(2) * y.size(3))
+    x = x.view(x.size(0), x.size(1) * x.size(2) * x.size(3))
+    y = y.view(y.size(0), y.size(1) * y.size(2) * y.size(3))
+
+    x = x / x.size(1)
+    y = y / y.size(1)
 
     xx, yy, zz = torch.mm(x,x.t()), torch.mm(y,y.t()), torch.mm(x,y.t())
 
