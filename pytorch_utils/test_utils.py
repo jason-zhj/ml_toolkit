@@ -44,3 +44,12 @@ def run_test(query_loader,db_loader,query_hash_model,db_hash_model,radius):
         "precision-recall-results": precision_recall_results,
         "precision-recall-curve": pr_curve
     }
+
+	
+def save_test_results(test_results,save_to):
+    # create folder
+    if (not os.path.exists(save_to)): os.makedirs(save_to)
+    # save
+    test_results["precision-recall-curve"].save(os.path.join(save_to, "precision-recall.png"))
+    with open(os.path.join(save_to, "metrics.txt"), "w") as f:
+        f.write(str(test_results["precision-recall-results"]))

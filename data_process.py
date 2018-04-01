@@ -1,4 +1,13 @@
 import numpy as np
+import torch 
+from torch.autograd import Variable
+
+def make_variable(tensor, volatile=False,requires_grad=False):
+    """Convert Tensor to Variable."""
+    if torch.cuda.is_available():
+        tensor = tensor.cuda()
+    return Variable(tensor, volatile=volatile, requires_grad = requires_grad)
+
 
 def shuffle_aligned_list(data):
     """Shuffle arrays in a list by shuffling each array identically."""

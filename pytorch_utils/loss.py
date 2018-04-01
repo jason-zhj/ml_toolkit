@@ -16,7 +16,7 @@ def normalize_by_rows(m):
 
 
 def get_pairwise_sim_loss(feats,labels,num_classes=31,normalize=True,feat_scale=16):
-    labels_onehot = autocuda(Variable(convert_to_onehot(labels=labels,num_class=num_classes),requires_grad=False))
+    labels_onehot = autocuda(Variable(convert_to_onehot(labels=labels,num_class=num_classes).float(),requires_grad=False))
 
     # do inner product of features
     vec_len = feats.data.size(1)
@@ -57,35 +57,55 @@ def get_crossdom_pairwise_sim_loss(src_feats,tgt_feats,src_labels,tgt_labels,num
     num_pairs = len(src_labels) * len(tgt_labels)
     return torch.sum(-sum_log_prob) / num_pairs if normalize else torch.sum(-sum_log_prob)
 
-def get_mmd_loss(x,y, alpha=1.0):
-    """
-    this will first normalize each row before computing MMD
-    :param x: source domain features
-    :param y: target domain features
-    :param alpha: kernel parameter
-    :return: RBF Kernel MMD
-    """
+def _linear_mmd_loss(x,y):
+    "MMD loss with linear kernel"
+    x = x.view(x.size(0), -1)
+    y = y.view(y.size(0), -1)
+    vec_len = x.data.size(1)
+    x_bar = x.mean(0) #TODO: which axis will it sum over?
+    y_bar = y.mean(0)
+    z_bar = x_bar - y_bar
+    return torch.dot(z_bar,z_bar) / vec_len
+
+def _rbf_mmd_loss(x,y,alpha=1.0):
+    "MMD loss with RBF kernel"
     assert len(x) == len(y)
-    B = len(x) # batch size
+    B = len(x)  # batch size
     x = x.view(x.size(0), x.size(1) * x.size(2) * x.size(3))
     y = y.view(y.size(0), y.size(1) * y.size(2) * y.size(3))
 
     x = x / x.size(1)
     y = y / y.size(1)
 
-    xx, yy, zz = torch.mm(x,x.t()), torch.mm(y,y.t()), torch.mm(x,y.t())
+    xx, yy, zz = torch.mm(x, x.t()), torch.mm(y, y.t()), torch.mm(x, y.t())
 
     rx = (xx.diag().unsqueeze(0).expand_as(xx))
     ry = (yy.diag().unsqueeze(0).expand_as(yy))
 
-    K = torch.exp(- alpha * (rx.t() + rx - 2*xx))
-    L = torch.exp(- alpha * (ry.t() + ry - 2*yy))
-    P = torch.exp(- alpha * (rx.t() + ry - 2*zz))
+    K = torch.exp(- alpha * (rx.t() + rx - 2 * xx))
+    L = torch.exp(- alpha * (ry.t() + ry - 2 * yy))
+    P = torch.exp(- alpha * (rx.t() + ry - 2 * zz))
 
-    beta = (1./(B*(B-1)))
-    gamma = (2./(B*B))
+    beta = (1. / (B * (B - 1)))
+    gamma = (2. / (B * B))
 
-    return beta * (torch.sum(K)+torch.sum(L)) - gamma * torch.sum(P)
+    return beta * (torch.sum(K) + torch.sum(L)) - gamma * torch.sum(P)
+
+def get_mmd_loss(x,y, kernel="rbf",alpha=1.0):
+    """
+    this will first normalize each row before computing MMD
+    :param x: source domain features
+    :param y: target domain features
+    :param kernel: "rbf" or "linear"
+    :param alpha: kernel parameter
+    :return: RBF Kernel MMD
+    """
+    if (kernel == "rbf"):
+        return _rbf_mmd_loss(x=x,y=y,alpha=alpha)
+    elif (kernel == "linear"):
+        return _linear_mmd_loss(x=x,y=y)
+    else:
+        raise Exception("{} is not a valid kernel".format(kernel))
 
 def get_L2_norm(x):
     "return ||x||2"
@@ -113,4 +133,4 @@ def get_quantization_loss(continuous_code):
             torch.add(discrete_code, torch.neg(continuous_code)), 2
         )
     )
-    return quantization_loss / len(continuous_code)
+    return quantization_loss / (continuous_code.data.size(0) * continuous_code.data.size(1)) # normalize by batch_size * code_length
