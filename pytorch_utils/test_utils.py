@@ -1,6 +1,7 @@
 import torch
 import os
 from ml_toolkit.hash_toolkit.metrics.precision_recall import calculate_precision_recall,get_precision_recall_curve
+from ml_toolkit.pytorch_utils.misc import make_variable
 
 def load_models(path,model_names,test_mode=True):
     "load .model files, return a dict {name:model_obj}"
@@ -43,6 +44,23 @@ def run_test(query_loader,db_loader,query_hash_model,db_hash_model,radius):
     return {
         "precision-recall-results": precision_recall_results,
         "precision-recall-curve": pr_curve
+    }
+
+
+def run_classification_test(data_loader,clf_model):
+    "run classification test, return accuracy"
+    total = 0
+    correct = 0
+
+    for images, labels in data_loader:
+        outputs = clf_model(make_variable(images.float()))
+        _, predicted = torch.max(outputs.data, 1)
+        total += predicted.size(0)
+        correct += (predicted == labels).sum()
+
+    # calculate accuracy
+    return {
+        "accuracy": correct * 100.0 / total
     }
 
 	
