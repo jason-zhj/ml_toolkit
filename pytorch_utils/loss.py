@@ -4,9 +4,9 @@ Utilities for calculating common loss
 import torch
 import sys, os
 from torch.autograd import Variable
-sys.path.append(os.path.dirname(__file__))
-from preprocess import convert_to_onehot
-from misc import autocuda
+
+from ml_toolkit.pytorch_utils.preprocess import convert_to_onehot
+from ml_toolkit.pytorch_utils.misc import autocuda
 
 
 def normalize_by_rows(m):
@@ -15,14 +15,16 @@ def normalize_by_rows(m):
     return m.div(qn.expand_as(m))
 
 
-def get_pairwise_sim_loss(feats,labels,num_classes=31,normalize=True,feat_scale=16):
+def get_pairwise_sim_loss(feats,labels,num_classes=31,normalize=True,feat_scale=16,sigmoid_alpha=1):
     labels_onehot = autocuda(Variable(convert_to_onehot(labels=labels,num_class=num_classes).float(),requires_grad=False))
 
     # do inner product of features
     vec_len = feats.data.size(1)
     A_square = torch.mm(feats, feats.t()) / vec_len * feat_scale # we need to divide the vector length, otherwise the loss will be affected by the length of hash code
     TINY = 10e-8
-    A_square_sigmod = (torch.sigmoid(A_square) - 0.5) * (1 - TINY) + 0.5
+    A_square_sigmod = (torch.sigmoid(A_square * sigmoid_alpha) - 0.5) * (1 - TINY) + 0.5
+    # print("avg abs of sigmoid: {}".format(torch.abs(A_square_sigmod - 0.5).mean().data.numpy()[0]))
+    # print("max abs of sigmoid: {}".format(torch.abs(A_square_sigmod - 0.5).max().data.numpy()[0]))
     is_same_lbl = torch.mm(labels_onehot, labels_onehot.t())
 
     # calc log probability loss
@@ -35,7 +37,7 @@ def get_pairwise_sim_loss(feats,labels,num_classes=31,normalize=True,feat_scale=
     return torch.sum(-sum_log_prob) / num_pairs if normalize else torch.sum(-sum_log_prob)
 
 
-def get_crossdom_pairwise_sim_loss(src_feats,tgt_feats,src_labels,tgt_labels,num_classes=31,normalize=True,feat_scale=16):
+def get_crossdom_pairwise_sim_loss(src_feats,tgt_feats,src_labels,tgt_labels,num_classes=31,normalize=True,feat_scale=16,sigmoid_alpha=1):
     "loss: sum(logp(hi,hj)), where p is defined by sigmoid function"
     src_labels_onehot = autocuda(Variable(convert_to_onehot(labels=src_labels, num_class=num_classes), requires_grad=False))
     tgt_labels_onehot = autocuda(Variable(convert_to_onehot(labels=tgt_labels, num_class=num_classes),
@@ -46,7 +48,7 @@ def get_crossdom_pairwise_sim_loss(src_feats,tgt_feats,src_labels,tgt_labels,num
     # get inner product
     A_square = torch.mm(src_feats, tgt_feats.t()) / vec_len * feat_scale  # we need to divide the vector length, otherwise the loss will be affected by the length of hash code
     TINY = 10e-8
-    A_square_sigmod = (torch.sigmoid(A_square) - 0.5) * (1 - TINY) + 0.5
+    A_square_sigmod = (torch.sigmoid(A_square * sigmoid_alpha) - 0.5) * (1 - TINY) + 0.5
 
     # calc log probability
     is_same_lbl = torch.mm(src_labels_onehot, tgt_labels_onehot.t())
@@ -134,3 +136,56 @@ def get_quantization_loss(continuous_code):
         )
     )
     return quantization_loss / (continuous_code.data.size(0) * continuous_code.data.size(1)) # normalize by batch_size * code_length
+
+
+def get_euclidean_distance(H):
+    """
+    The euclidean distance |hi-hj|^2 can be decomposed as |hi|^2 + |hj|^2 - 2 * <hi,hj>
+    :param H: H is a matrix, with each row being a vector
+    :return: a matrix containing euclidean distance of each pair of vectors
+    """
+    num_vectors = H.size(0)
+
+    # compute |hi|^2 + |hj|^2
+    squared = torch.pow(H,2)
+    square_sum = torch.sum(squared,dim=1)
+    square_sum_matrix = square_sum.repeat(1,num_vectors)
+
+    # compute <hi,hj>
+    inner_products = torch.mm(H,H.t())
+
+    # |hi|^2 + |hj|^2 - 2 * <hi,hj>
+    result = square_sum_matrix + square_sum_matrix.t() - 2 * inner_products
+
+    return result
+
+def get_tdist_pairwise_similarity_loss(feats,labels,tanh_alpha=None):
+    """
+    this is an implementation of t-distribution pairwise similarity loss,
+    as proposed in the paper "Transfer Adversarial Hashing for Hamming Space Retrieval"
+    :param feats: a matrix, with each row being a vector
+    :param labels: array of one-hot vectors
+    compute - sum of log of p(Sij|hi,hj)
+    p(Sij|hi,hj) = tanh(tanh_alpha * sim(hi,hj)) if Sij = 1
+                 = 1 - tanh(tanh_alpha * sim(hi,hj)) if Sij = 0
+    sim(hi,hj) = feat_length / (1 + euclidean_distance(hi,hj) )
+    """
+    assert feats.size(0) == labels.size(0)
+    feat_len = feats.size(1)
+    tanh_alpha = 2.00 / feat_len if tanh_alpha is None else tanh_alpha
+
+    # compute sim(hi,hj)
+    distance_matrix = get_euclidean_distance(H=feats)
+    sim = feat_len / (1 + distance_matrix)
+
+    # compute tanh(tanh_alpha * sim(hi,hj))
+    sim_tanh = torch.tanh(tanh_alpha * sim)
+
+    # compute sum of log[ p(Sij|hi,hj) ]
+    is_same_lbl = torch.mm(labels, labels.t())
+    log_prob = torch.mul(torch.log(sim_tanh), is_same_lbl) + torch.mul(torch.log(1 - sim_tanh), 1 - is_same_lbl)
+    sum_log_prob = (log_prob.sum() - log_prob.diag().sum()) / 2.0
+
+    # normalize the sum by # of pairs of feat vectors
+    num_pairs = feats.size(0) * (feats.size(0) - 1) / 2
+    return - sum_log_prob / num_pairs
