@@ -3,6 +3,7 @@ Utilities for calculating common loss
 """
 import torch
 import sys, os
+import numpy as np
 from torch.autograd import Variable
 
 from ml_toolkit.pytorch_utils.preprocess import convert_to_onehot
@@ -23,8 +24,6 @@ def get_pairwise_sim_loss(feats,labels,num_classes=31,normalize=True,feat_scale=
     A_square = torch.mm(feats, feats.t()) / vec_len * feat_scale # we need to divide the vector length, otherwise the loss will be affected by the length of hash code
     TINY = 10e-8
     A_square_sigmod = (torch.sigmoid(A_square * sigmoid_alpha) - 0.5) * (1 - TINY) + 0.5
-    # print("avg abs of sigmoid: {}".format(torch.abs(A_square_sigmod - 0.5).mean().data.numpy()[0]))
-    # print("max abs of sigmoid: {}".format(torch.abs(A_square_sigmod - 0.5).max().data.numpy()[0]))
     is_same_lbl = torch.mm(labels_onehot, labels_onehot.t())
 
     # calc log probability loss
@@ -155,7 +154,7 @@ def get_euclidean_distance(H):
     inner_products = torch.mm(H,H.t())
 
     # |hi|^2 + |hj|^2 - 2 * <hi,hj>
-    result = square_sum_matrix + square_sum_matrix.t() - 2 * inner_products
+    result = torch.clamp(square_sum_matrix + square_sum_matrix.t() - 2 * inner_products,min=1e-8)
 
     return result
 
@@ -183,6 +182,7 @@ def get_tdist_pairwise_similarity_loss(feats,labels,tanh_alpha=None):
 
     # compute sum of log[ p(Sij|hi,hj) ]
     is_same_lbl = torch.mm(labels, labels.t())
+
     log_prob = torch.mul(torch.log(sim_tanh), is_same_lbl) + torch.mul(torch.log(1 - sim_tanh), 1 - is_same_lbl)
     sum_log_prob = (log_prob.sum() - log_prob.diag().sum()) / 2.0
 
